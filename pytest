@@ -1,0 +1,167 @@
+# =============================
+# PYTEST AUTOMATION FRAMEWORK
+# =============================
+
+# Folder Structure:
+# automation-framework/
+# │
+# ├── tests/
+# │   ├── test_login.py
+# │   ├── test_dashboard.py
+# │
+# ├── pages/
+# │   ├── login_page.py
+# │   ├── dashboard_page.py
+# │
+# ├── utils/
+# │   ├── config_reader.py
+# │   ├── logger.py
+# │
+# ├── conftest.py
+# ├── requirements.txt
+# ├── pytest.ini
+#
+
+# =============================
+# requirements.txt
+# =============================
+# pytest
+# selenium
+# requests
+# pytest-html
+# webdriver-manager
+
+
+# =============================
+# conftest.py
+# =============================
+import pytest
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+
+@pytest.fixture(scope="function")
+def setup():
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service)
+    driver.maximize_window()
+    yield driver
+    driver.quit()
+
+
+# =============================
+# utils/config_reader.py
+# =============================
+
+class Config:
+    BASE_URL = "https://the-internet.herokuapp.com/login"
+    USERNAME = "tomsmith"
+    PASSWORD = "SuperSecretPassword!"
+
+
+# =============================
+# utils/logger.py
+# =============================
+
+import logging
+
+def get_logger():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        filename="automation.log",
+        filemode="a"
+    )
+    return logging.getLogger()
+
+
+# =============================
+# pages/login_page.py
+# =============================
+
+from selenium.webdriver.common.by import By
+
+class LoginPage:
+    def __init__(self, driver):
+        self.driver = driver
+        self.username = (By.ID, "username")
+        self.password = (By.ID, "password")
+        self.login_btn = (By.XPATH, "//button[@type='submit']")
+
+    def enter_username(self, username):
+        self.driver.find_element(*self.username).send_keys(username)
+
+    def enter_password(self, password):
+        self.driver.find_element(*self.password).send_keys(password)
+
+    def click_login(self):
+        self.driver.find_element(*self.login_btn).click()
+
+
+# =============================
+# pages/dashboard_page.py
+# =============================
+
+from selenium.webdriver.common.by import By
+
+class DashboardPage:
+    def __init__(self, driver):
+        self.driver = driver
+        self.success_msg = (By.ID, "flash")
+
+    def get_success_message(self):
+        return self.driver.find_element(*self.success_msg).text
+
+
+# =============================
+# tests/test_login.py
+# =============================
+
+from pages.login_page import LoginPage
+from pages.dashboard_page import DashboardPage
+from utils.config_reader import Config
+
+
+def test_valid_login(setup):
+    driver = setup
+    driver.get(Config.BASE_URL)
+
+    login = LoginPage(driver)
+    dashboard = DashboardPage(driver)
+
+    login.enter_username(Config.USERNAME)
+    login.enter_password(Config.PASSWORD)
+    login.click_login()
+
+    msg = dashboard.get_success_message()
+    assert "You logged into a secure area" in msg
+
+
+# =============================
+# tests/test_dashboard.py
+# =============================
+
+
+def test_dashboard_title(setup):
+    driver = setup
+    driver.get("https://the-internet.herokuapp.com/secure")
+    assert "Secure Area" in driver.page_source
+
+
+# =============================
+# pytest.ini
+# =============================
+
+[pytest]
+addopts = -v --html=report.html
+markers =
+    smoke: smoke test cases
+    regression: regression test cases
+
+
+# =============================
+# HOW TO RUN
+# =============================
+# 1. pip install -r requirements.txt
+# 2. pytest
+# 3. pytest -m smoke
